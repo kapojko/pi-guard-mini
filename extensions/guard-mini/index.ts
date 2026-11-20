@@ -29,6 +29,9 @@
  *   /guard enforcement [gentle|hard]
  *   /guard unseal          — lift the git seal.
  *
+ * Defaults live in config.ts and are resolved at use time; the config file
+ * only ever holds keys the user set explicitly via /guard.
+ *
  * All detections, seal transitions, and refusals are appended to
  * ~/.pi/agent/guard-mini-incidents.jsonl. The session transcript is never
  * modified. Fail-open: a detector or IO error never blocks a tool by itself.
@@ -37,9 +40,22 @@
  */
 import { type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Text } from "@earendil-works/pi-tui";
-import { appendFile, mkdir, readFile, writeFile } from "node:fs/promises";
+import { appendFile, mkdir, readFile } from "node:fs/promises";
 import { homedir } from "node:os";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
+import {
+	AGENT_DIR,
+	isQwenModel,
+	MODES,
+	ENFORCEMENTS,
+	modeActive,
+	readConfig,
+	resolveEnforcement,
+	writeConfig,
+	type Enforcement,
+	type GuardConfig,
+	type Mode,
+} from "./config.ts";
 import { detectGuard, DANGEROUS_CLASSES, type GuardMatch } from "./detect.ts";
 import { classifyCommand, evaluateShellCommand, isFileMutationTool, type SealState } from "./seal.ts";
 import {
@@ -52,31 +68,17 @@ import {
 
 // ── Tunables ────────────────────────────────────────────────────────────
 
-const AGENT_DIR = join(homedir(), ".pi", "agent");
-const CONFIG_PATH = join(AGENT_DIR, "guard-mini.json");
 const LOG_PATH = join(AGENT_DIR, "guard-mini-incidents.jsonl");
-const QWEN_MATCH = "qwen3.8";
-const MODES = ["always", "qwen38-only", "disabled"] as const;
-const ENFORCEMENTS = ["gentle", "hard"] as const;
 const SCANNED_CACHE_LIMIT = 16;
-
-type Mode = (typeof MODES)[number];
-type Enforcement = (typeof ENFORCEMENTS)[number];
 
 /** Structural subset of ExtensionContext used by the helpers below. */
 interface UiCtx {
 	model?: { id: string };
+	sessionManager: { getSessionId(): string };
 	ui: {
 		setStatus(id: string, text: string | undefined): void;
 		notify(msg: string, kind: "info" | "warning" | "error"): void;
 	};
-}
-
-interface GuardConfig {
-	promptMode?: Mode;
-	thinkingMode?: Mode;
-	sealMode?: Mode;
-	enforcement?: Enforcement;
 }
 
 interface IncidentRecord {
@@ -95,28 +97,6 @@ interface IncidentRecord {
 	action: string;
 	enforcement: Enforcement;
 	detail?: string;
-}
-
-// ── Config ──────────────────────────────────────────────────────────────
-
-async function readConfig(): Promise<GuardConfig> {
-	try {
-		return JSON.parse(await readFile(CONFIG_PATH, "utf8")) as GuardConfig;
-	} catch {
-		return {};
-	}
-}
-
-async function writeConfig(patch: Partial<GuardConfig>): Promise<void> {
-	const merged: GuardConfig = { ...(await readConfig()), ...patch };
-	await mkdir(AGENT_DIR, { recursive: true });
-	await writeFile(CONFIG_PATH, JSON.stringify(merged, null, "\t") + "\n", "utf8");
-}
-
-function modeActive(mode: Mode | undefined, modelId: string | undefined): boolean {
-	if (mode === "always") return true;
-	if (mode === "qwen38-only") return (modelId ?? "").toLowerCase().includes(QWEN_MATCH);
-	return false;
 }
 
 // ── Extension ────────────────────────────────────────────────────────────
@@ -192,11 +172,11 @@ export default function guardMini(pi: ExtensionAPI): void {
 		await appendIncident({
 			ts: new Date().toISOString(),
 			feature: "seal",
-			session: "",
+			session: ctx.sessionManager.getSessionId(),
 			model: ctx.model?.id ?? "",
 			epoch,
 			action: `seal:${state}`,
-			enforcement: config.enforcement ?? "gentle",
+			enforcement: resolveEnforcement(config.enforcement),
 			detail: reason,
 		});
 		updateStatus(ctx);
@@ -233,7 +213,7 @@ export default function guardMini(pi: ExtensionAPI): void {
 				excerpt: m.excerpt,
 				genuineExcerpt: lastGenuinePrompt?.slice(0, 200),
 				action: "suppressed",
-				enforcement: config.enforcement ?? "gentle",
+				enforcement: resolveEnforcement(config.enforcement),
 			});
 		}
 	}
@@ -255,7 +235,7 @@ export default function guardMini(pi: ExtensionAPI): void {
 			if (m.grounded) continue;
 			if (steeredThisEpoch.has(m.guardClass)) continue;
 			steeredThisEpoch.add(m.guardClass);
-			const hard = config.enforcement === "hard" && DANGEROUS_CLASSES.includes(m.guardClass);
+			const hard = resolveEnforcement(config.enforcement) === "hard" && DANGEROUS_CLASSES.includes(m.guardClass);
 			if (hard) {
 				block = true;
 				ctx.ui.notify(`guard-mini: ${m.guardClass} detection — run blocked (${m.rule})`, "error");
@@ -281,7 +261,7 @@ export default function guardMini(pi: ExtensionAPI): void {
 				excerpt: m.excerpt,
 				genuineExcerpt: lastGenuinePrompt?.slice(0, 200),
 				action: hard ? "blocked" : "steered",
-				enforcement: config.enforcement ?? "gentle",
+				enforcement: resolveEnforcement(config.enforcement),
 			});
 		}
 		return block;
@@ -360,7 +340,7 @@ export default function guardMini(pi: ExtensionAPI): void {
 						toolCallId: event.toolCallId,
 						toolName: event.toolName,
 						action: "refused",
-						enforcement: config.enforcement ?? "gentle",
+						enforcement: resolveEnforcement(config.enforcement),
 						detail: `${event.toolName} while ${seal}`,
 					});
 					return { block: true, reason: SEAL_REFUSAL_TEXT };
@@ -383,7 +363,7 @@ export default function guardMini(pi: ExtensionAPI): void {
 							toolName: event.toolName,
 							excerpt: command.slice(0, 200),
 							action: "refused",
-							enforcement: config.enforcement ?? "gentle",
+							enforcement: resolveEnforcement(config.enforcement),
 							detail: decision.detail,
 						});
 						return { block: true, reason: SEAL_REFUSAL_TEXT };
@@ -440,7 +420,7 @@ export default function guardMini(pi: ExtensionAPI): void {
 					epoch,
 					toolCallId: event.toolCallId,
 					action: "seal:unchanged",
-					enforcement: config.enforcement ?? "gentle",
+					enforcement: resolveEnforcement(config.enforcement),
 					detail: "recognized git commit failed; seal not applied",
 				});
 			}
@@ -458,7 +438,7 @@ export default function guardMini(pi: ExtensionAPI): void {
 					epoch,
 					toolCallId: event.toolCallId,
 					action: "seal:unchanged",
-					enforcement: config.enforcement ?? "gentle",
+					enforcement: resolveEnforcement(config.enforcement),
 					detail: "recognized git push failed; allowance not consumed",
 				});
 			}
@@ -558,14 +538,15 @@ export default function guardMini(pi: ExtensionAPI): void {
 			const modelId = ctx.model?.id ?? "?";
 			const counts = await sessionCounts(ctx.sessionManager.getSessionId());
 			const countText = Object.entries(counts).map(([k, v]) => `${k}: ${v}`).join(", ") || "none";
-			const active = (mode: Mode | undefined) => (modeActive(mode, modelId) ? " [active]" : "");
+			const modeLine = (mode: Mode | undefined) =>
+				`${mode ?? "qwen38-only"}${mode === undefined ? " (default)" : ""}${modeActive(mode, modelId) ? " [active]" : ""}`;
 			ctx.ui.notify(
 				[
-					`model: ${modelId}${modelId.toLowerCase().includes(QWEN_MATCH) ? " (qwen3.8 match)" : ""}`,
-					`prompt: ${config.promptMode ?? "qwen38-only"}${active(config.promptMode)}`,
-					`thinking: ${config.thinkingMode ?? "qwen38-only"}${active(config.thinkingMode)}`,
-					`seal: ${config.sealMode ?? "qwen38-only"}${active(config.sealMode)}`,
-					`enforcement: ${config.enforcement ?? "gentle"}`,
+					`model: ${modelId}${isQwenModel(modelId) ? " (qwen3.8 match)" : ""}`,
+					`prompt: ${modeLine(config.promptMode)}`,
+					`thinking: ${modeLine(config.thinkingMode)}`,
+					`seal: ${modeLine(config.sealMode)}`,
+					`enforcement: ${config.enforcement ?? "gentle"}${config.enforcement === undefined ? " (default)" : ""}`,
 					`seal state: ${seal}`,
 					`detections this session — ${countText}`,
 				].join("\n"),
