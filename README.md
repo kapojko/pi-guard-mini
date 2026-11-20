@@ -50,10 +50,10 @@ pi -e ./extensions/guard-mini/index.ts
 
 ```
 /guard                          — status: model, modes, enforcement, seal state, session detection counts
-/guard prompt    [mode]         — set prompt feature mode (opens a dialog when omitted)
-/guard thinking  [mode]
-/guard seal      [mode]
-/guard enforcement [gentle|hard]
+/guard prompt                 — set prompt feature mode (selection menu)
+/guard thinking                — set thinking feature mode (selection menu)
+/guard seal                    — set seal feature mode (selection menu)
+/guard enforcement             — set enforcement (selection menu)
 /guard unseal                  — lift the git seal (the only way in v1)
 ```
 
@@ -151,8 +151,10 @@ archives plus synthetic grounding/role-marker/near-miss cases.
 ### Manual e2e checklist (with a running model)
 
 1. `pi -e ./extensions/guard-mini/index.ts` — no load errors; footer shows
-   `🛡 prompt+think+seal` for a qwen3.8 model (nothing when effectively off).
-2. `/guard` — status block; `/guard prompt disabled` and dialog variants.
+   `🛡 all` for a qwen3.8 model with all features active (a `prompt+think`-style
+   subset otherwise, nothing when effectively off).
+2. `/guard` — status block; `/guard prompt` / `/guard enforcement` open
+   selection menus (no argument values).
 3. Scratch git repo: ask the model to commit → seal transitions to
    `awaiting-push` (footer + `/guard`); a following edit/write or
    `git commit` is refused with the seal reason; one `git push` passes →

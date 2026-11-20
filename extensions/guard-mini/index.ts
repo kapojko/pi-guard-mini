@@ -23,10 +23,9 @@
  *
  *   /guard                 — status: model, modes, enforcement, seal state,
  *                            detection counts for this session.
- *   /guard prompt|thinking|seal [mode]
- *                          — set a feature mode (opens a selection dialog
- *                            when the mode is omitted).
- *   /guard enforcement [gentle|hard]
+ *   /guard prompt|thinking|seal
+ *                          — set a feature mode (selection dialog).
+ *   /guard enforcement     — set enforcement (selection dialog).
  *   /guard unseal          — lift the git seal.
  *
  * Defaults live in config.ts and are resolved at use time; the config file
@@ -503,32 +502,11 @@ export default function guardMini(pi: ExtensionAPI): void {
 		description: "guard-mini: status, feature modes (prompt/thinking/seal), enforcement, unseal",
 		getArgumentCompletions: (argumentText) => {
 			const text = argumentText.trimStart().toLowerCase();
-			if (!text.includes(" ")) {
-				const matches = GUARD_SUBCOMMANDS.filter((s) => s.value.startsWith(text));
-				return matches.length ? matches : GUARD_SUBCOMMANDS;
-			}
-			// Second token: complete the mode / enforcement value. pi-tui
-			// replaces the whole argument text with item.value, so the
-			// value repeats the subcommand.
-			const modeMatch = text.match(/^(prompt|thinking|seal)\s+(\S*)$/);
-			if (modeMatch) {
-				const items = MODES.filter((m) => m.startsWith(modeMatch[2])).map((m) => ({
-					value: `${modeMatch[1]} ${m}`,
-					label: m,
-					description: "always | qwen38-only | disabled",
-				}));
-				return items.length ? items : null;
-			}
-			const enfMatch = text.match(/^enforcement\s+(\S*)$/);
-			if (enfMatch) {
-				const items = ENFORCEMENTS.filter((e) => e.startsWith(enfMatch[1])).map((e) => ({
-					value: `enforcement ${e}`,
-					label: e,
-					description: "gentle | hard",
-				}));
-				return items.length ? items : null;
-			}
-			return null;
+			// No sub-subcommands: values are picked from selection menus,
+			// so only the first token is completed.
+			if (text.includes(" ")) return null;
+			const matches = GUARD_SUBCOMMANDS.filter((s) => s.value.startsWith(text));
+			return matches.length ? matches : GUARD_SUBCOMMANDS;
 		},
 		handler: async (args: string, ctx) => {
 			const argv = args.trim().split(/\s+/).filter(Boolean);
@@ -545,15 +523,12 @@ export default function guardMini(pi: ExtensionAPI): void {
 
 			if (sub === "prompt" || sub === "thinking" || sub === "seal") {
 				const key = sub === "prompt" ? "promptMode" : sub === "thinking" ? "thinkingMode" : "sealMode";
-				let mode = argv[1] as Mode | undefined;
-				if (mode !== undefined && !MODES.includes(mode)) {
-					ctx.ui.notify(`guard-mini: unknown mode "${mode}" (always | qwen38-only | disabled)`, "error");
+				if (argv[1] !== undefined) {
+					ctx.ui.notify(`guard-mini: /guard ${sub} takes no argument — pick a mode from the menu`, "error");
 					return;
 				}
-				if (mode === undefined) {
-					mode = await ctx.ui.select(`${sub} mode:`, [...MODES]) as Mode | undefined;
-					if (mode === undefined) return;
-				}
+				const mode = await ctx.ui.select(`${sub} mode:`, [...MODES]) as Mode | undefined;
+				if (mode === undefined) return;
 				await writeConfig({ [key]: mode } as Partial<GuardConfig>);
 				config = await readConfig();
 				ctx.ui.notify(`guard-mini: ${sub} mode = ${mode}`, "info");
@@ -562,15 +537,12 @@ export default function guardMini(pi: ExtensionAPI): void {
 			}
 
 			if (sub === "enforcement") {
-				let value = argv[1] as Enforcement | undefined;
-				if (value !== undefined && !ENFORCEMENTS.includes(value)) {
-					ctx.ui.notify(`guard-mini: unknown enforcement "${value}" (gentle | hard)`, "error");
+				if (argv[1] !== undefined) {
+					ctx.ui.notify(`guard-mini: /guard enforcement takes no argument — pick from the menu`, "error");
 					return;
 				}
-				if (value === undefined) {
-					value = await ctx.ui.select("enforcement:", [...ENFORCEMENTS]) as Enforcement | undefined;
-					if (value === undefined) return;
-				}
+				const value = await ctx.ui.select("enforcement:", [...ENFORCEMENTS]) as Enforcement | undefined;
+				if (value === undefined) return;
 				await writeConfig({ enforcement: value });
 				config = await readConfig();
 				ctx.ui.notify(`guard-mini: enforcement = ${value}`, value === "hard" ? "warning" : "info");
@@ -579,7 +551,7 @@ export default function guardMini(pi: ExtensionAPI): void {
 
 			if (sub !== undefined) {
 				ctx.ui.notify(
-					"guard-mini: usage: /guard [prompt|thinking|seal|enforcement [value]] | /guard unseal",
+					"guard-mini: usage: /guard [prompt|thinking|seal|enforcement] | /guard unseal (values are picked from menus)",
 					"error",
 				);
 				return;
