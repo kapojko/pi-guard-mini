@@ -39,7 +39,7 @@
  * Model-facing texts live in texts.ts (see README, "Model-facing texts").
  */
 import { type ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { Text } from "@earendil-works/pi-tui";
+import { Text, type AutocompleteItem } from "@earendil-works/pi-tui";
 import { appendFile, mkdir, readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
@@ -167,7 +167,8 @@ export default function guardMini(pi: ExtensionAPI): void {
 			ctx.ui.setStatus(STATUS_KEY, undefined);
 			return;
 		}
-		let text = `${STATUS_PREFIX}${flags.join("+")}`;
+		const body = flags.length === 3 ? "all" : flags.join("+");
+		let text = `${STATUS_PREFIX}${body}`;
 		if (seal !== "unsealed") text += ` · ${seal}`;
 		ctx.ui.setStatus(STATUS_KEY, text);
 	}
@@ -490,8 +491,45 @@ export default function guardMini(pi: ExtensionAPI): void {
 
 	// ── command ──
 
+	const GUARD_SUBCOMMANDS: AutocompleteItem[] = [
+		{ value: "prompt", label: "prompt", description: "Prompt damper mode (always | qwen38-only | disabled)" },
+		{ value: "thinking", label: "thinking", description: "Thinking guard mode (always | qwen38-only | disabled)" },
+		{ value: "seal", label: "seal", description: "Git seal mode (always | qwen38-only | disabled)" },
+		{ value: "enforcement", label: "enforcement", description: "Enforcement: gentle | hard" },
+		{ value: "unseal", label: "unseal", description: "Lift the git seal" },
+	];
+
 	pi.registerCommand("guard", {
 		description: "guard-mini: status, feature modes (prompt/thinking/seal), enforcement, unseal",
+		getArgumentCompletions: (argumentText) => {
+			const text = argumentText.trimStart().toLowerCase();
+			if (!text.includes(" ")) {
+				const matches = GUARD_SUBCOMMANDS.filter((s) => s.value.startsWith(text));
+				return matches.length ? matches : GUARD_SUBCOMMANDS;
+			}
+			// Second token: complete the mode / enforcement value. pi-tui
+			// replaces the whole argument text with item.value, so the
+			// value repeats the subcommand.
+			const modeMatch = text.match(/^(prompt|thinking|seal)\s+(\S*)$/);
+			if (modeMatch) {
+				const items = MODES.filter((m) => m.startsWith(modeMatch[2])).map((m) => ({
+					value: `${modeMatch[1]} ${m}`,
+					label: m,
+					description: "always | qwen38-only | disabled",
+				}));
+				return items.length ? items : null;
+			}
+			const enfMatch = text.match(/^enforcement\s+(\S*)$/);
+			if (enfMatch) {
+				const items = ENFORCEMENTS.filter((e) => e.startsWith(enfMatch[1])).map((e) => ({
+					value: `enforcement ${e}`,
+					label: e,
+					description: "gentle | hard",
+				}));
+				return items.length ? items : null;
+			}
+			return null;
+		},
 		handler: async (args: string, ctx) => {
 			const argv = args.trim().split(/\s+/).filter(Boolean);
 			const sub = argv[0];
