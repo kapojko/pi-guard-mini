@@ -151,7 +151,7 @@ archives plus synthetic grounding/role-marker/near-miss cases.
 ### Manual e2e checklist (with a running model)
 
 1. `pi -e ./extensions/guard-mini/index.ts` — no load errors; footer shows
-   `guard: prompt+think+seal` for a qwen3.8 model.
+   `🛡 prompt+think+seal` for a qwen3.8 model (nothing when effectively off).
 2. `/guard` — status block; `/guard prompt disabled` and dialog variants.
 3. Scratch git repo: ask the model to commit → seal transitions to
    `awaiting-push` (footer + `/guard`); a following edit/write or

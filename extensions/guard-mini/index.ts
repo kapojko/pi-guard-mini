@@ -70,6 +70,8 @@ import {
 
 const LOG_PATH = join(AGENT_DIR, "guard-mini-incidents.jsonl");
 const SCANNED_CACHE_LIMIT = 16;
+/** Footer status prefix: shield symbol, no colon. */
+const STATUS_PREFIX = "🛡 ";
 
 /** Structural subset of ExtensionContext used by the helpers below. */
 interface UiCtx {
@@ -154,7 +156,12 @@ export default function guardMini(pi: ExtensionAPI): void {
 			modeActive(config.thinkingMode, modelId) && "think",
 			modeActive(config.sealMode, modelId) && "seal",
 		].filter(Boolean);
-		let text = flags.length ? `guard: ${flags.join("+")}` : "guard: off";
+		// Effectively off (no feature active for this model): write nothing.
+		if (flags.length === 0) {
+			ctx.ui.setStatus("guard", undefined);
+			return;
+		}
+		let text = `${STATUS_PREFIX}${flags.join("+")}`;
 		if (seal !== "unsealed") text += ` · ${seal}`;
 		ctx.ui.setStatus("guard", text);
 	}
