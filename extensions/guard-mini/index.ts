@@ -72,6 +72,12 @@ const LOG_PATH = join(AGENT_DIR, "guard-mini-incidents.jsonl");
 const SCANNED_CACHE_LIMIT = 16;
 /** Footer status prefix: shield symbol, no colon. */
 const STATUS_PREFIX = "🛡 ";
+/**
+ * Footer status key. The footer sorts extension statuses alphabetically by
+ * key, so the key must outrank the other installed statuses:
+ * "pi-permission-system" (yolo) < "pps-tps" < "z-proxy" < this.
+ */
+const STATUS_KEY = "zz-guard";
 
 /** Structural subset of ExtensionContext used by the helpers below. */
 interface UiCtx {
@@ -158,12 +164,12 @@ export default function guardMini(pi: ExtensionAPI): void {
 		].filter(Boolean);
 		// Effectively off (no feature active for this model): write nothing.
 		if (flags.length === 0) {
-			ctx.ui.setStatus("guard", undefined);
+			ctx.ui.setStatus(STATUS_KEY, undefined);
 			return;
 		}
 		let text = `${STATUS_PREFIX}${flags.join("+")}`;
 		if (seal !== "unsealed") text += ` · ${seal}`;
-		ctx.ui.setStatus("guard", text);
+		ctx.ui.setStatus(STATUS_KEY, text);
 	}
 
 	// ── seal transitions ──
