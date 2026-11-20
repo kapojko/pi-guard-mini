@@ -499,7 +499,7 @@ export default function guardMini(pi: ExtensionAPI): void {
 	];
 
 	pi.registerCommand("guard", {
-		description: "guard-mini: status, feature modes (prompt/thinking/seal), enforcement, unseal",
+		description: "guard-mini: /guard shows status; /guard prompt|thinking|seal|enforcement opens a menu; /guard unseal lifts the seal",
 		getArgumentCompletions: (argumentText) => {
 			const text = argumentText.trimStart().toLowerCase();
 			// No sub-subcommands: values are picked from selection menus,
