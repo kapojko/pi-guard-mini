@@ -25,6 +25,7 @@ test("modeActive: unset key follows the default (no pinning)", () => {
 	assert.equal(modeActive(undefined, "qwen3.8-27b"), true);
 	assert.equal(modeActive(undefined, "qwen3.8-27b-single"), true);
 	assert.equal(modeActive(undefined, "swift-1.5-qwen3.8-27b"), true);
+	assert.equal(modeActive(undefined, "daisyrose-27b"), true);
 	assert.equal(modeActive(undefined, "claude-opus-4"), false);
 	assert.equal(modeActive(undefined, undefined), false);
 });
@@ -42,6 +43,9 @@ test("isQwenModel: substring match, case-insensitive", () => {
 	assert.equal(isQwenModel("Qwen3.8-27B-Single"), true);
 	assert.equal(isQwenModel("swift-1.5-qwen3.8-27b"), true);
 	assert.equal(isQwenModel("qwen38-27b"), false); // no dot — not matched
+	assert.equal(isQwenModel("daisyrose-27b"), true); // known Qwen3.8 finetune
+	assert.equal(isQwenModel("DaisyRose-27B-UD"), true); // case-insensitive substring
+	assert.equal(isQwenModel("/mnt/models/daisyrose-27b-gguf"), true);
 	assert.equal(isQwenModel(""), false);
 	assert.equal(isQwenModel(undefined), false);
 });

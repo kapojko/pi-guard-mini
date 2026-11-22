@@ -20,7 +20,8 @@ default (steering messages, not blocks).
 ## Features
 
 Three independent features, each with mode `always | qwen38-only | disabled`
-(default `qwen38-only`; the model id must contain `qwen3.8`):
+(default `qwen38-only`; the model id must contain `qwen3.8`, or a known
+Qwen3.8-family finetune id such as `daisyrose-27b`):
 
 | Feature | What it does |
 |---|---|

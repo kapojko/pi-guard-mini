@@ -15,6 +15,8 @@ export const AGENT_DIR = join(homedir(), ".pi", "agent");
 export const CONFIG_PATH = join(AGENT_DIR, "guard-mini.json");
 
 export const QWEN_MATCH = "qwen3.8";
+/** Extra model ids (finetunes) accepted as Qwen3.8-family regardless of their base name. */
+export const EXTRA_MODEL_MATCHES = ["daisyrose-27b"];
 export const MODES = ["always", "qwen38-only", "disabled"] as const;
 export const ENFORCEMENTS = ["gentle", "hard"] as const;
 
@@ -41,9 +43,13 @@ export function resolveEnforcement(value: Enforcement | undefined): Enforcement 
 	return value ?? DEFAULT_ENFORCEMENT;
 }
 
-/** True when the model id belongs to the Qwen3.8 family (e.g. qwen3.8-27b, swift-1.5-qwen3.8-27b). */
+/**
+ * True when the model id belongs to the Qwen3.8 family (e.g. qwen3.8-27b,
+ * swift-1.5-qwen3.8-27b) or is a known finetune of it (e.g. daisyrose-27b).
+ */
 export function isQwenModel(modelId: string | undefined): boolean {
-	return (modelId ?? "").toLowerCase().includes(QWEN_MATCH);
+	const id = (modelId ?? "").toLowerCase();
+	return id.includes(QWEN_MATCH) || EXTRA_MODEL_MATCHES.some((m) => id.includes(m));
 }
 
 /** Is a feature with this configured mode active for the given model? */

@@ -1,6 +1,6 @@
 {
 	"name": "pi-guard-mini",
-	"version": "0.1.0",
+	"version": "0.1.1",
 	"description": "Pi extension: hallucinated-instruction guard (thinking detector + steering) and git commit/push seal for the pi coding agent",
 	"keywords": ["pi-package"],
 	"license": "MIT",

@@ -2,7 +2,8 @@
  * guard-mini — hallucinated-instruction guard for the pi coding agent.
  *
  * Three independent features, each with mode `always | qwen38-only | disabled`
- * (default `qwen38-only`, matched when the model id contains "qwen3.8"):
+ * (default `qwen38-only`, matched when the model id contains "qwen3.8" or a
+ * known Qwen3.8-family finetune id such as "daisyrose-27b"):
  *
  *   prompt        — injects a short damper section into the system prompt
  *                   (texts.ts: PROMPT_SECTION_TEXT).
@@ -565,7 +566,7 @@ export default function guardMini(pi: ExtensionAPI): void {
 				`${mode ?? "qwen38-only"}${mode === undefined ? " (default)" : ""}${modeActive(mode, modelId) ? " [active]" : ""}`;
 			ctx.ui.notify(
 				[
-					`model: ${modelId}${isQwenModel(modelId) ? " (qwen3.8 match)" : ""}`,
+					`model: ${modelId}${isQwenModel(modelId) ? " (qwen3.8 family)" : ""}`,
 					`prompt: ${modeLine(config.promptMode)}`,
 					`thinking: ${modeLine(config.thinkingMode)}`,
 					`seal: ${modeLine(config.sealMode)}`,
