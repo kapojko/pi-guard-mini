@@ -70,8 +70,19 @@ import {
 
 const LOG_PATH = join(AGENT_DIR, "guard-mini-incidents.jsonl");
 const SCANNED_CACHE_LIMIT = 16;
-/** Footer status prefix: shield symbol, no colon. */
-const STATUS_PREFIX = "🛡 ";
+/**
+ * Footer status prefix: shield symbol, no colon.
+ *
+ * The U+FE0F presentation selector is load-bearing, not decoration. Bare
+ * 🛡 (U+1F6E1) is *neutral* in East Asian Width, so pi-tui's grapheme width
+ * counts it as ONE cell while the terminal draws it as an emoji in TWO —
+ * every following character is then drawn one cell early and lands on top of
+ * the shield. FE0F itself is zero-width in the terminal, but pi counts it as
+ * one cell, so "🛡\uFE0F " measures 2 in pi AND renders 2 in the terminal:
+ * two wrongs that happen to make a right. Do not "tidy" the FE0F away. The
+ * same trap exists for ⏱ (U+23F1) and friends (also EAW-neutral).
+ */
+const STATUS_PREFIX = "🛡\uFE0F ";
 /**
  * Footer status key. The footer sorts extension statuses alphabetically by
  * key, so the key must outrank the other installed statuses:
